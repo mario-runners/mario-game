@@ -1,6 +1,5 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
-
 canvas.width = innerWidth;
 canvas.height = innerHeight;
 
@@ -8,78 +7,94 @@ const gravity = 0.67;
 let scrollOffset = 0;
 let isMuted = false;
 
-// Load images
-const marioImg = new Image();
-marioImg.src = "https://art.pixilart.com/49f92202ce99ade.png";
-
-const goombaImg = new Image();
-goombaImg.src = "https://static.wikia.nocookie.net/mario/images/7/7d/SMBW_Goomba.png/revision/latest?cb=20240227211641";
-
-const flagImg = new Image();
-flagImg.src = "https://i.imgur.com/mD7RTeZ.png"; // sample flag image
-
-// Music
-const music = new Audio("https://lambda.vgmtreasurechest.com/soundtracks/super-mario-bros.-wonder-switch-gamerip-2023/lqwibiml/1-75.%20Ninji%20Disco.mp3");
-music.loop = true;
-music.volume = 0.5;
-music.play();
-
-// Mute button
-const muteBtn = document.getElementById("muteBtn");
-muteBtn.onclick = () => {
-  isMuted = !isMuted;
-  music.muted = isMuted;
-  muteBtn.textContent = isMuted ? "🔇" : "🔊";
-};
-
-// Ground
-const groundHeight = 100;
-
 // Player
 const player = {
   x: 100,
-  y: canvas.height - groundHeight - 64,
+  y: canvas.height - 164,
   width: 50,
   height: 64,
   velocityX: 0,
   velocityY: 0,
   speed: 5,
   jumping: false,
-  alive: true
+  state: "small" // small, big, fire
 };
 
-// Goombas
-const goombas = [
-  { x: 700, y: canvas.height - groundHeight - 40, width: 40, height: 40, alive: true },
-  { x: 1200, y: canvas.height - groundHeight - 40, width: 40, height: 40, alive: true }
-];
+// Fireballs
+const fireballs = [];
 
-// Platforms (ground, gap, slopes)
+// Platforms
+const groundHeight = 100;
 const platforms = [
   { x: 0, y: canvas.height - groundHeight, width: 600, height: groundHeight },
-  { x: 700, y: canvas.height - groundHeight, width: 300, height: groundHeight },
-  { x: 1300, y: canvas.height - groundHeight - 50, width: 400, height: groundHeight + 50 },
-  { x: 1800, y: canvas.height - groundHeight - 100, width: 400, height: groundHeight + 100 },
-  { x: 2300, y: canvas.height - groundHeight, width: 300, height: groundHeight }
+  { x: 650, y: canvas.height - groundHeight - 50, width: 300, height: 50 },
+  { x: 1000, y: canvas.height - groundHeight, width: 400, height: groundHeight }
 ];
 
-// Goal
-const goal = { x: 2600, y: canvas.height - groundHeight - 150, width: 40, height: 150 };
+// Goal Poles
+const fakeGoal = { x: 950, y: canvas.height - groundHeight - 150, width: 40, height: 150 };
+const realGoal = { x: 1100, y: canvas.height - groundHeight - 150, width: 40, height: 150 };
+
+// Load images
+const marioImg = {
+  small: new Image(),
+  big: new Image(),
+  fire: new Image()
+};
+marioImg.small.src = "assets/sprites/mario/small_mario.png";
+marioImg.big.src = "assets/sprites/mario/big_mario.png";
+marioImg.fire.src = "assets/sprites/mario/fire_mario.png";
+
+const goalFakeImg = new Image();
+goalFakeImg.src = "assets/sprites/goal-poles/GoalPole_Fake.png";
+const goalRealImg = new Image();
+goalRealImg.src = "assets/sprites/goal-poles/Regular_GoalPole.png";
+
+// Music
+const music = new Audio("assets/music/overworld.mp3");
+music.loop = true;
+music.volume = 0.5;
+music.play();
+
+// Buttons
+document.getElementById("muteBtn").onclick = () => {
+  isMuted = !isMuted;
+  music.muted = isMuted;
+  document.getElementById("muteBtn").textContent = isMuted ? "🔇" : "🔊";
+};
+
+// Fire button
+document.getElementById("fireBtn").onclick = () => {
+  if(player.state === "fire") {
+    fireballs.push({ x: player.x + player.width, y: player.y + 20, radius: 10, speed: 10 });
+  }
+};
 
 // Controls
 let keys = {};
-onkeydown = (e) => (keys[e.code] = true);
-onkeyup = (e) => (keys[e.code] = false);
+onkeydown = (e) => keys[e.code] = true;
+onkeyup = (e) => keys[e.code] = false;
+
+// D-pad buttons
+const buttonMap = { left: "ArrowLeft", right: "ArrowRight", up: "ArrowUp", down: "ArrowDown" };
+for(let id in buttonMap){
+  const key = buttonMap[id];
+  const btn = document.getElementById(id);
+  btn.addEventListener("touchstart", () => keys[key] = true);
+  btn.addEventListener("touchend", () => keys[key] = false);
+  btn.addEventListener("mousedown", () => keys[key] = true);
+  btn.addEventListener("mouseup", () => keys[key] = false);
+}
 
 // Update
 function update() {
   // Movement
-  if (keys["ArrowRight"]) player.velocityX = player.speed;
-  else if (keys["ArrowLeft"]) player.velocityX = -player.speed;
-  else player.velocityX = 0;
+  player.velocityX = 0;
+  if(keys["ArrowRight"]) player.velocityX = player.speed;
+  if(keys["ArrowLeft"]) player.velocityX = -player.speed;
 
   // Jump
-  if (keys["Space"] && !player.jumping) {
+  if(keys["ArrowUp"] && !player.jumping){
     player.velocityY = -15;
     player.jumping = true;
   }
@@ -89,67 +104,53 @@ function update() {
   player.x += player.velocityX;
   player.y += player.velocityY;
 
-  // Camera scroll
+  // Camera
   scrollOffset = player.x - 100;
 
-  // Ground/platform collision
-  let onGround = false;
-  for (let plat of platforms) {
-    const px = plat.x - scrollOffset;
-    if (
-      player.x + player.width > plat.x &&
-      player.x < plat.x + plat.width &&
-      player.y + player.height > plat.y &&
-      player.y + player.height < plat.y + 20 &&
-      player.velocityY >= 0
-    ) {
+  // Platform collision
+  for(const plat of platforms){
+    if(player.x + player.width > plat.x &&
+       player.x < plat.x + plat.width &&
+       player.y + player.height > plat.y &&
+       player.y + player.height < plat.y + 20 &&
+       player.velocityY >= 0
+      ){
       player.y = plat.y - player.height;
       player.velocityY = 0;
       player.jumping = false;
-      onGround = true;
     }
   }
 
   // Respawn if falls
-  if (player.y > canvas.height) {
+  if(player.y > canvas.height){
+    if(player.state === "fire") player.state = "big";
+    else if(player.state === "big") player.state = "small";
+    else { player.x = 100; player.y = canvas.height - groundHeight - 64; }
     player.x = 100;
     player.y = canvas.height - groundHeight - 64;
     player.velocityY = 0;
   }
 
-  // Goomba logic
-  for (let g of goombas) {
-    if (!g.alive) continue;
-    g.x -= 1; // move left slowly
-    const gx = g.x - scrollOffset;
-
-    // Collision with player
-    if (
-      player.x + player.width > g.x &&
-      player.x < g.x + g.width &&
-      player.y + player.height > g.y &&
-      player.y < g.y + g.height
-    ) {
-      if (player.velocityY > 0 && player.y + player.height - g.y < 20) {
-        // Stomped
-        g.alive = false;
-        player.velocityY = -10; // bounce
-      } else {
-        // Hit from side
-        player.x = 100;
-        player.y = canvas.height - groundHeight - 64;
-        player.velocityY = 0;
-      }
-    }
+  // Fireball update
+  for(let i = fireballs.length - 1; i >= 0; i--){
+    fireballs[i].x += fireballs[i].speed;
+    if(fireballs[i].x > canvas.width + scrollOffset) fireballs.splice(i,1);
   }
 
-  // Goal check
-  if (
-    player.x + player.width > goal.x &&
-    player.x < goal.x + goal.width &&
-    player.y + player.height > goal.y
-  ) {
-    alert("Level Complete!");
+  // Fake goal check
+  if(player.x + player.width > fakeGoal.x &&
+     player.x < fakeGoal.x + fakeGoal.width &&
+     player.y + player.height > fakeGoal.y){
+    alert("🚫 Fake Goal! Find the real one!");
+    player.x = 100;
+    player.y = canvas.height - groundHeight - 64;
+  }
+
+  // Real goal check
+  if(player.x + player.width > realGoal.x &&
+     player.x < realGoal.x + realGoal.width &&
+     player.y + player.height > realGoal.y){
+    alert("🎉 Level Complete!");
     player.x = 100;
     player.y = canvas.height - groundHeight - 64;
   }
@@ -157,31 +158,34 @@ function update() {
 
 // Draw
 function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  // Draw platforms
+  // Platforms
   ctx.fillStyle = "#8B4513";
-  for (let plat of platforms) {
-    ctx.fillRect(plat.x - scrollOffset, plat.y, plat.width, plat.height);
+  for(const plat of platforms) ctx.fillRect(plat.x - scrollOffset, plat.y, plat.width, plat.height);
+
+  // Player
+  ctx.drawImage(marioImg[player.state], player.x - scrollOffset, player.y, player.width, player.height);
+
+  // Fireballs
+  ctx.fillStyle = "orange";
+  for(const f of fireballs){
+    ctx.beginPath();
+    ctx.arc(f.x - scrollOffset, f.y, f.radius, 0, Math.PI*2);
+    ctx.fill();
   }
 
-  // Draw Goombas
-  for (let g of goombas) {
-    if (g.alive) ctx.drawImage(goombaImg, g.x - scrollOffset, g.y, g.width, g.height);
-  }
-
-  // Draw player
-  ctx.drawImage(marioImg, player.x - scrollOffset, player.y, player.width, player.height);
-
-  // Draw goal
-  ctx.drawImage(flagImg, goal.x - scrollOffset, goal.y, goal.width, goal.height);
+  // Goal poles
+  ctx.drawImage(goalFakeImg, fakeGoal.x - scrollOffset, fakeGoal.y, fakeGoal.width, fakeGoal.height);
+  ctx.drawImage(goalRealImg, realGoal.x - scrollOffset, realGoal.y, realGoal.width, realGoal.height);
 }
 
 // Loop
-function gameLoop() {
+function gameLoop(){
   update();
   draw();
   requestAnimationFrame(gameLoop);
 }
 
+gameLoop();
 gameLoop();
