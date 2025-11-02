@@ -5,6 +5,12 @@ body {
   touch-action: none;
 }
 
+canvas {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+
 #controls {
   position: fixed;
   bottom: 15px;
@@ -16,7 +22,7 @@ body {
 }
 
 #controls button {
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.75);
   border: 2px solid #333;
   border-radius: 50%;
   font-size: 24px;
@@ -29,7 +35,7 @@ body {
 }
 
 #controls button:active {
-  background: rgba(255, 200, 200, 0.9);
+  background: rgba(255, 150, 150, 0.9);
 }
 
 #muteBtn {
@@ -40,5 +46,6 @@ body {
   height: 50px;
   font-size: 20px;
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.5);
+  border: none;
+  background: rgba(255, 255, 255, 0.7);
 }
