@@ -34,7 +34,8 @@ let player = {
   grounded: false,
   state: "small", // small | big | fire
   facingRight: true,
-  slidingFlag: false
+  slidingFlag: false,
+  invincible: 0
 };
 
 // 🔥 Fireballs
@@ -52,18 +53,18 @@ for (let i = 0; i < levelWidth; i += 64) {
 }
 
 // Staircase to goal
-for (let i = 0; i < 5; i++) {
+for (let i = 0; i < 6; i++) {
   platforms.push({ x: 9400 + i * 64, y: canvas.height - groundHeight - i * 64, w: 64, h: 64, img: brickImg });
 }
 
 // Question block
-const qBlock = { x: 600, y: 300, w: 32, h: 32, hit: false };
+const qBlock = { x: 600, y: canvas.height - groundHeight - 128, w: 32, h: 32, hit: false };
 
 // Fire flower
 let fireFlower = null;
 
 // Goal pole
-const goalPole = { x: 9700, y: canvas.height - 320, w: 32, h: 320 };
+const goalPole = { x: 9800, y: canvas.height - 320, w: 32, h: 320 };
 
 // Enemies
 let goombas = [{ x: 800, y: canvas.height - groundHeight - 32, w: 32, h: 32, dir: -1 }];
@@ -99,6 +100,10 @@ function shootFire() {
   }
 }
 
+function rectsCollide(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
 // 🧠 Game Loop
 function update() {
   if (player.slidingFlag) return;
@@ -114,7 +119,6 @@ function update() {
     player.velX = 0;
   }
 
-  // Jump
   if (keys[" "]) jump();
 
   // Gravity
@@ -125,74 +129,109 @@ function update() {
 
   // Collisions
   for (let p of platforms) {
-    if (
-      player.x < p.x + p.w &&
-      player.x + player.w > p.x &&
-      player.y < p.y + p.h &&
-      player.y + player.h > p.y
-    ) {
-      if (player.velY > 0) {
-        player.y = p.y - player.h;
-        player.velY = 0;
-        player.grounded = true;
+    if (!rectsCollide(player, p)) continue;
+
+    const overlapX = (player.x + player.w / 2) - (p.x + p.w / 2);
+    const overlapY = (player.y + player.h / 2) - (p.y + p.h / 2);
+    const halfW = (player.w + p.w) / 2;
+    const halfH = (player.h + p.h) / 2;
+
+    if (Math.abs(overlapX) < halfW && Math.abs(overlapY) < halfH) {
+      const diffX = halfW - Math.abs(overlapX);
+      const diffY = halfH - Math.abs(overlapY);
+
+      if (diffX >= diffY) {
+        if (overlapY > 0) {
+          // Hit from below
+          player.y += diffY;
+          player.velY = 0;
+
+          // Check if block hit is question block
+          if (p === qBlock && !qBlock.hit) {
+            qBlock.hit = true;
+            fireFlower = { x: qBlock.x, y: qBlock.y, w: 32, h: 32, vy: -1.5, resting: false };
+          }
+        } else {
+          // Landed on top
+          player.y -= diffY;
+          player.velY = 0;
+          player.grounded = true;
+        }
+      } else {
+        // Left/Right
+        if (overlapX > 0) player.x += diffX;
+        else player.x -= diffX;
+        player.velX = 0;
       }
     }
   }
 
-  // Question block hit
-  if (!qBlock.hit && player.velY < 0 && player.y < qBlock.y + qBlock.h &&
-      player.x + player.w > qBlock.x && player.x < qBlock.x + qBlock.w) {
-    qBlock.hit = true;
-    fireFlower = { x: qBlock.x, y: qBlock.y - 32, w: 32, h: 32, vy: -2 };
-  }
-
-  // Fire flower float up
+  // Fire flower behavior
   if (fireFlower) {
-    fireFlower.y += fireFlower.vy;
-    if (fireFlower.y <= qBlock.y - 64) fireFlower.vy = 0;
-
+    if (!fireFlower.resting) {
+      fireFlower.y += fireFlower.vy;
+      if (fireFlower.y <= qBlock.y - 32) {
+        fireFlower.vy = 0;
+        fireFlower.resting = true;
+      }
+    }
     // Pickup
-    if (
-      player.x < fireFlower.x + fireFlower.w &&
-      player.x + player.w > fireFlower.x &&
-      player.y < fireFlower.y + fireFlower.h &&
-      player.y + player.h > fireFlower.y
-    ) {
+    if (rectsCollide(player, fireFlower)) {
       fireFlower = null;
       player.state = "fire";
     }
   }
 
   // Fireballs move
-  for (let f of fireballs) f.x += f.velX;
+  fireballs.forEach(f => f.x += f.velX);
+  fireballs = fireballs.filter(f => f.x > camera.x && f.x < camera.x + canvas.width * 2);
 
   // Goombas move
   for (let g of goombas) {
-    g.x += g.dir * 1.5;
-    if (g.x < 700 || g.x > 1000) g.dir *= -1;
-  }
+    g.x += g.dir * 1.2;
 
-  // Fireball hits goomba
-  goombas = goombas.filter(g => {
-    for (let f of fireballs) {
-      if (f.x > g.x && f.x < g.x + g.w && f.y > g.y && f.y < g.y + g.h) {
-        return false;
+    // Flip direction if hitting edge of ground
+    if (g.x < 700 || g.x > 1000) g.dir *= -1;
+
+    // Player collision
+    if (rectsCollide(player, g) && player.invincible <= 0) {
+      if (player.velY > 0 && player.y + player.h - 5 < g.y + g.h) {
+        // Stomp
+        player.velY = -8;
+        g.dead = true;
+      } else {
+        // Damage
+        if (player.state === "fire") player.state = "big";
+        else if (player.state === "big") player.state = "small";
+        else {
+          alert("☠️ You Died!");
+          location.reload();
+        }
+        player.invincible = 60;
       }
     }
-    return true;
-  });
+  }
+  goombas = goombas.filter(g => !g.dead);
+
+  // Fireball hits goomba
+  for (let f of fireballs) {
+    for (let g of goombas) {
+      if (rectsCollide({ x: f.x - f.radius, y: f.y - f.radius, w: f.radius*2, h: f.radius*2 }, g)) {
+        g.dead = true;
+      }
+    }
+  }
+
+  if (player.invincible > 0) player.invincible--;
 
   // Flagpole detection
   if (
     !player.slidingFlag &&
-    player.x + player.w > goalPole.x &&
-    player.x < goalPole.x + goalPole.w &&
-    player.y + player.h > goalPole.y &&
-    player.y < goalPole.y + goalPole.h
+    rectsCollide(player, goalPole)
   ) {
     player.slidingFlag = true;
     player.velX = player.velY = 0;
-    player.x = goalPole.x - player.w + 5;
+    player.x = goalPole.x - player.w + 10;
     const slide = setInterval(() => {
       player.y += 3;
       if (player.y + player.h >= canvas.height - groundHeight) {
