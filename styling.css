@@ -1,36 +1,83 @@
-/* Basic */
-:root{
-  --ui-size: 64px;
+body {
+    margin: 0;
+    background: #87cefa;
+    overflow: hidden;
+    font-family: sans-serif;
 }
-*{box-sizing:border-box}
-html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;color:#fff;background:#000}
-.screen{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:18px}
-.hidden{display:none !important}
 
-/* Title screen */
-#titleScreen{background:#000 center/cover no-repeat; padding:20px}
-#titleImage{width:min(820px,78%);height:auto;max-height:60vh;object-fit:contain;display:block;border-radius:8px;box-shadow:0 10px 30px rgba(0,0,0,0.6)}
-#titleButtons{display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:12px}
-#startBtn{font-size:20px;padding:14px 36px;border-radius:12px;border:none;background:#ffcc00;color:#000;cursor:pointer}
-#titleHint{font-size:12px;color:#ddd;opacity:.9}
+/* Title */
+#titleScreen {
+    position: fixed;
+    inset: 0;
+    background: black;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
 
-/* Preloader overlay */
-.overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:50}
-#loaderBox{width:min(700px,90%);padding:18px;border-radius:12px;background:linear-gradient(180deg,#0b1b2b,#071224);box-shadow:0 10px 40px rgba(0,0,0,0.6);text-align:center}
-#loaderText{margin-bottom:14px;font-size:16px}
-#loaderBar{height:14px;background:#22364d;border-radius:8px;overflow:hidden}
-#loaderProgress{height:100%;width:0%;background:linear-gradient(90deg,#ffd54a,#ff7043)}
+#titleImage {
+    width: 70%;
+    max-width: 480px;
+}
+
+#startBtn {
+    margin-top: 40px;
+    font-size: 32px;
+    padding: 12px 40px;
+}
+
+/* Intro video */
+#levelIntro {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: none;
+}
 
 /* Canvas */
-canvas{display:block;width:100vw;height:100vh;background:#6bb5ff;}
+#gameCanvas {
+    display: none;
+    background: #87cefa;
+    margin: 0 auto;
+}
 
-/* Controls D-Pad centered bottom */
-#controls{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;z-index:40;pointer-events:auto}
-.dpad{display:flex;flex-direction:column;align-items:center;gap:10px}
-.dpad-row{display:flex;gap:12px;align-items:center}
-.ctl{width:var(--ui-size);height:var(--ui-size);border-radius:14px;border:2px solid #fff;background:rgba(0,0,0,0.55);color:#fff;font-size:24px;display:flex;align-items:center;justify-content:center;touch-action:none}
-.ctl.fire{background:linear-gradient(180deg,#ff6b00,#ff3d00);font-size:26px}
-.ctl:active{transform:translateY(2px);opacity:.95}
+/* Controls */
+#controls {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+    display: flex;
+    justify-content: space-between;
+    pointer-events: none;
+}
 
-/* Mute UI button (top-right) */
-.ui{position:fixed;top:16px;right:16px;padding:8px 10px;border-radius:8px;border:none;background:rgba(255,255,255,0.08);color:#fff;font-size:20px;z-index:45}
+.dpad, .fire-button {
+    pointer-events: auto;
+}
+
+.dpad {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.dpad .mid-row {
+    display: flex;
+    gap: 6px;
+}
+
+button {
+    font-size: 28px;
+    padding: 20px;
+    border-radius: 10px;
+    border: none;
+    background: white;
+}
+
+.fire-button {
+    font-size: 34px;
+}
