@@ -1,143 +1,139 @@
-/***********************
- * ASSET PATHS
- ************************/
-const BASE = "https://raw.githubusercontent.com/mario-runners/mario-game/main/assets/";
+//------------------------------------
+// ASSET PATHS
+//------------------------------------
+const ASSET = "https://raw.githubusercontent.com/mario-runners/mario-game/main/assets/";
 
-const ASSETS = {
-    music: {
-        title: BASE + "music/title.mp3",
-        overworld: BASE + "music/overworld.mp3"
-    },
-    sprites: {
-        mario: {
-            small: BASE + "sprites/mario/small_mario.png",
-            big:   BASE + "sprites/mario/big_mario.png",
-            fire:  BASE + "sprites/mario/fire_mario.png"
-        },
-        blocks: {
-            ground: BASE + "sprites/blocks/ground.png",
-            brick: BASE + "sprites/blocks/brick.png",
-            qblock: BASE + "sprites/blocks/?block.png"
-        },
-        enemies: {
-            goomba: BASE + "sprites/enemies/goomba.png"
-        },
-        powerups: {
-            fireflower: BASE + "sprites/powerups/fireflower.png"
-        },
-        goal: BASE + "sprites/goal-poles/Regular_GoalPole.png"
+const IMAGES = {
+    marioSmall: ASSET + "sprites/mario/small_mario.png",
+    marioBig:   ASSET + "sprites/mario/big_mario.png",
+    marioFire:  ASSET + "sprites/mario/fire_mario.png",
+    goomba:     ASSET + "sprites/enemies/goomba.png",
+    qblock:     ASSET + "sprites/blocks/%3Fblock.png",
+    brick:      ASSET + "sprites/blocks/brick.png",
+    ground:     ASSET + "sprites/blocks/ground.png",
+    flower:     ASSET + "sprites/powerups/fireflower.png",
+    goal:       ASSET + "sprites/goal-poles/GoalPole_Normal.png",
+    cloud:      ASSET + "sprites/bg/cloud.png"
+};
+
+const MUSIC = {
+    title: ASSET + "music/title.mp3",
+    overworld: ASSET + "music/overworld.mp3",
+};
+
+const INTRO = ASSET + "intros/1-1.mp4";
+
+
+//------------------------------------
+// PRELOAD SYSTEM
+//------------------------------------
+let loadCount = 0;
+let loadTotal = 0;
+
+function preload(src, type = "image") {
+    loadTotal++;
+    if (type === "image") {
+        let img = new Image();
+        img.src = src;
+        img.onload = () => loadCount++;
+        return img;
+    } else if (type === "audio") {
+        let audio = new Audio(src);
+        audio.oncanplaythrough = () => loadCount++;
+        return audio;
     }
+}
+
+const titleScreen = document.getElementById("titleScreen");
+const introVideo = document.getElementById("introVideo");
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+const controls = document.getElementById("controls");
+
+
+//------------------------------------
+// LOAD IMAGES
+//------------------------------------
+const marioSmallImg = preload(IMAGES.marioSmall);
+const marioBigImg   = preload(IMAGES.marioBig);
+const marioFireImg  = preload(IMAGES.marioFire);
+const goombaImg     = preload(IMAGES.goomba);
+const qblockImg     = preload(IMAGES.qblock);
+const brickImg      = preload(IMAGES.brick);
+const groundImg     = preload(IMAGES.ground);
+const flowerImg     = preload(IMAGES.flower);
+const goalImg       = preload(IMAGES.goal);
+const cloudImg      = preload(IMAGES.cloud);
+
+const titleMusic    = preload(MUSIC.title, "audio");
+const overworldMusic = preload(MUSIC.overworld, "audio");
+
+
+//------------------------------------
+// WAIT FOR EVERYTHING TO LOAD
+//------------------------------------
+let checkLoad = setInterval(() => {
+    if (loadCount >= loadTotal) {
+        clearInterval(checkLoad);
+        titleMusic.loop = true;
+        titleMusic.play();
+    }
+}, 100);
+
+
+//------------------------------------
+// GAME STATE
+//------------------------------------
+let gameStarted = false;
+let player = {
+    x: 100,
+    y: 300,
+    w: 40,
+    h: 50,
+    vx: 0,
+    vy: 0,
+    onGround: false,
+    facing: 1,
+    state: "small"   // small, big, fire
 };
 
 
-/***********************
- * DOM ELEMENTS
- ************************/
-const titleScreen = document.getElementById("title-screen");
-const startButton = document.getElementById("start-button");
-const introVideo = document.getElementById("intro-video");
-const canvas = document.getElementById("gameCanvas");
-const controls = document.getElementById("controls");
-
-const ctx = canvas.getContext("2d");
-canvas.width = innerWidth;
-canvas.height = innerHeight;
-
-
-/***********************
- * AUDIO
- ************************/
-const titleMusic = new Audio(ASSETS.music.title);
-titleMusic.loop = true;
-
-const overworldMusic = new Audio(ASSETS.music.overworld);
-overworldMusic.loop = true;
-
-
-/***********************
- * TITLE LOGIC
- ************************/
-titleMusic.play();
-
-startButton.onclick = async () => {
+//------------------------------------
+// TITLE SCREEN -> INTRO -> GAME
+//------------------------------------
+document.getElementById("startButton").onclick = () => {
+    titleScreen.style.display = "none";
     titleMusic.pause();
-    titleScreen.classList.add("hidden");
 
-    introVideo.classList.remove("hidden");
-
-    try {
-        await introVideo.play();
-    } catch {
-        startGame();
-        return;
-    }
+    introVideo.src = INTRO;
+    introVideo.style.display = "block";
+    introVideo.play();
 
     introVideo.onended = () => {
-        introVideo.classList.add("hidden");
-        startGame();
+        introVideo.style.display = "none";
+        setTimeout(() => startGame(), 500);
     };
 };
 
 
-/***********************
- * GAME STATE
- ************************/
-let gravity = 0.7;
-
-let mario = {
-    x: 200,
-    y: canvas.height - 200,
-    w: 48,
-    h: 52,
-    vx: 0,
-    vy: 0,
-    speed: 6,
-    jumping: false,
-    facing: 1, // 1 = right, -1 = left
-    state: "small" // small | big | fire
-};
-
-let keys = {};
-document.onkeydown = e => keys[e.code] = true;
-document.onkeyup = e => keys[e.code] = false;
-
-document.getElementById("left").ontouchstart = () => keys["ArrowLeft"] = true;
-document.getElementById("left").ontouchend   = () => keys["ArrowLeft"] = false;
-
-document.getElementById("right").ontouchstart = () => keys["ArrowRight"] = true;
-document.getElementById("right").ontouchend   = () => keys["ArrowRight"] = false;
-
-document.getElementById("jump").ontouchstart = () => keys["Space"] = true;
-document.getElementById("jump").ontouchend   = () => keys["Space"] = false;
-
-document.getElementById("fire-button").ontouchstart = () => shootFire();
+function startGame() {
+    canvas.style.display = "block";
+    controls.style.display = "block";
+    overworldMusic.currentTime = 0;
+    overworldMusic.loop = true;
+    overworldMusic.play();
+    gameStarted = true;
+    gameLoop();
+}
 
 
-/***********************
- * LOAD IMAGES
- ************************/
-const imgMarioSmall = new Image(); imgMarioSmall.src = ASSETS.sprites.mario.small;
-const imgMarioBig = new Image();   imgMarioBig.src = ASSETS.sprites.mario.big;
-const imgMarioFire = new Image();  imgMarioFire.src = ASSETS.sprites.mario.fire;
-
-const groundImg = new Image(); groundImg.src = ASSETS.sprites.blocks.ground;
-const brickImg = new Image();  brickImg.src = ASSETS.sprites.blocks.brick;
-const qblockImg = new Image(); qblockImg.src = ASSETS.sprites.blocks.qblock;
-
-const goombaImg = new Image(); goombaImg.src = ASSETS.sprites.enemies.goomba;
-
-const fireflowerImg = new Image(); fireflowerImg.src = ASSETS.sprites.powerups.fireflower;
-
-const goalImg = new Image(); goalImg.src = ASSETS.sprites.goal;
-
-
-/***********************
- * LEVEL GEOMETRY
- ************************/
-let platforms = [];
+//------------------------------------
+// LEVEL GEOMETRY (includes staircase)
+//------------------------------------
 const groundY = canvas.height - 80;
+let platforms = [];
 
-// Main ground runs 10,000px long
+// Main ground
 platforms.push({
     x: 0,
     y: groundY,
@@ -146,264 +142,132 @@ platforms.push({
     img: groundImg
 });
 
-// Fireflower block
-let flowerBlock = {
-    x: 800,
-    y: groundY - 200,
-    w: 40,
-    h: 40,
-    used: false
-};
+// Staircase
+const stairStartX = 9200;
+const stairSteps = 8;
+const stairSize = 40;
 
-// Enemy
-let goombas = [
-    { x: 1200, y: groundY - 50, w: 40, h: 50, vx: -1 }
-];
-
-// -----------------------------
-// STAIRCASE
-// -----------------------------
-const stairStart = 9200;
-const steps = 8;
-for (let i = 0; i < steps; i++) {
+for (let i = 0; i < stairSteps; i++) {
     platforms.push({
-        x: stairStart + i * 40,
-        y: groundY - (i + 1) * 40,
+        x: stairStartX + i * 40,
+        y: groundY - (i + 1) * stairSize,
         width: 40,
-        height: 40,
+        height: stairSize,
         img: brickImg
     });
 }
 
-// -----------------------------
-// GOAL POLE
-// -----------------------------
+// Goal
 const goalPole = {
-    x: stairStart + steps * 40 + 120,
+    x: stairStartX + stairSteps * 40 + 120,
     y: groundY - 150,
     w: 40,
     h: 150
 };
 
 
-/***********************
- * START GAME
- ************************/
-function startGame() {
-    canvas.classList.remove("hidden");
-    controls.style.display = "block";
-    overworldMusic.play();
+//------------------------------------
+// MAIN GAME LOOP
+//------------------------------------
+function gameLoop() {
+    if (!gameStarted) return;
+
+    update();
+    draw();
+
     requestAnimationFrame(gameLoop);
 }
 
 
-/***********************
- * FIREBALL LOGIC
- ************************/
-let fireballs = [];
-
-function shootFire() {
-    if (mario.state !== "fire") return;
-
-    fireballs.push({
-        x: mario.x + (mario.facing === 1 ? 30 : -10),
-        y: mario.y + 20,
-        vx: mario.facing * 8,
-        w: 12,
-        h: 12
-    });
-}
-
-
-/***********************
- * UPDATE LOOP
- ************************/
+//------------------------------------
+// UPDATE
+//------------------------------------
 function update() {
+    player.vy += 0.5; // gravity
+    player.x += player.vx;
+    player.y += player.vy;
 
-    // Movement
-    if (keys["ArrowRight"]) {
-        mario.vx = mario.speed;
-        mario.facing = 1;
-    } else if (keys["ArrowLeft"]) {
-        mario.vx = -mario.speed;
-        mario.facing = -1;
-    } else {
-        mario.vx = 0;
-    }
+    player.onGround = false;
 
-    // Jump
-    if (keys["Space"] && !mario.jumping) {
-        mario.vy = -15;
-        mario.jumping = true;
-    }
-
-    mario.vy += gravity;
-    mario.x += mario.vx;
-    mario.y += mario.vy;
-
-    // Platform collisions
-    let onGround = false;
+    // Collision
     for (let p of platforms) {
-        if (
-            mario.x + mario.w > p.x &&
-            mario.x < p.x + p.width &&
-            mario.y + mario.h > p.y &&
-            mario.y + mario.h < p.y + 30 &&
-            mario.vy >= 0
-        ) {
-            mario.y = p.y - mario.h;
-            mario.vy = 0;
-            mario.jumping = false;
-            onGround = true;
+        if (player.x < p.x + p.width &&
+            player.x + player.w > p.x &&
+            player.y + player.h > p.y &&
+            player.y + player.h < p.y + p.height + player.vy) {
+
+            player.y = p.y - player.h;
+            player.vy = 0;
+            player.onGround = true;
         }
     }
 
-    // Hitting ? Block
-    if (
-        !flowerBlock.used &&
-        mario.x + mario.w > flowerBlock.x &&
-        mario.x < flowerBlock.x + flowerBlock.w &&
-        mario.y < flowerBlock.y + flowerBlock.h &&
-        mario.y > flowerBlock.y - 20 &&
-        mario.vy < 0
-    ) {
-        flowerBlock.used = true;
-        powerup = { x: flowerBlock.x, y: flowerBlock.y - 50, w: 40, h: 40, vy: -2 };
+    // Flip left/right
+    if (player.vx < 0) player.facing = -1;
+    if (player.vx > 0) player.facing = 1;
+
+    // Goal
+    if (player.x > goalPole.x) {
+        alert("🏁 Level Complete!");
+        location.reload();
     }
 
-    // Powerup movement
-    if (typeof powerup !== "undefined") {
-        powerup.y += powerup.vy;
-        if (powerup.vy < 0) powerup.vy += 0.1;
-
-        // Collect
-        if (
-            mario.x + mario.w > powerup.x &&
-            mario.x < powerup.x + powerup.w &&
-            mario.y + mario.h > powerup.y &&
-            mario.y < powerup.y + powerup.h
-        ) {
-            mario.state = "fire";
-            delete powerup;
-        }
-    }
-
-    // Goomba movement
-    for (let g of goombas) {
-        g.x += g.vx;
-
-        // Collision with Mario
-        if (
-            mario.x + mario.w > g.x &&
-            mario.x < g.x + g.w &&
-            mario.y + mario.h > g.y &&
-            mario.y < g.y + g.h
-        ) {
-            // Stomp
-            if (mario.vy > 0) {
-                g.dead = true;
-                mario.vy = -10;
-            } else {
-                // Damage Mario
-                mario.state = "small";
-            }
-        }
-    }
-    goombas = goombas.filter(g => !g.dead);
-
-    // Fireball movement
-    for (let f of fireballs) {
-        f.x += f.vx;
-        for (let g of goombas) {
-            if (
-                f.x + f.w > g.x &&
-                f.x < g.x + g.w &&
-                f.y + f.h > g.y &&
-                f.y < g.y + g.h
-            ) {
-                g.dead = true;
-                f.dead = true;
-            }
-        }
-    }
-    fireballs = fireballs.filter(f => !f.dead);
-
-    // Goal pole
-    if (
-        mario.x + mario.w > goalPole.x &&
-        mario.x < goalPole.x + goalPole.w &&
-        mario.y + mario.h > goalPole.y
-    ) {
-        alert("🏁 LEVEL COMPLETE!");
+    // Death
+    if (player.y > canvas.height + 200) {
+        overworldMusic.pause();
+        alert("💀 You Died!");
         location.reload();
     }
 }
 
 
-/***********************
- * DRAW LOOP
- ************************/
+//------------------------------------
+// DRAW
+//------------------------------------
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Background
-    ctx.fillStyle = "#70c0ff";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Player sprite based on state
+    let sprite =
+        player.state === "small" ? marioSmallImg :
+        player.state === "big"   ? marioBigImg :
+        marioFireImg;
 
-    // Camera follows Mario
-    let cameraX = mario.x - canvas.width / 2;
-    if (cameraX < 0) cameraX = 0;
-
-    // Draw platforms
-    for (let p of platforms) {
-        ctx.drawImage(p.img, p.x - cameraX, p.y, p.width, p.height);
-    }
-
-    // Flower block
-    ctx.drawImage(flowerBlock.used ? brickImg : qblockImg,
-        flowerBlock.x - cameraX, flowerBlock.y, 40, 40);
-
-    // Powerup
-    if (typeof powerup !== "undefined") {
-        ctx.drawImage(fireflowerImg, powerup.x - cameraX, powerup.y, 40, 40);
-    }
-
-    // Goombas
-    for (let g of goombas) {
-        ctx.drawImage(goombaImg, g.x - cameraX, g.y, g.w, g.h);
-    }
-
-    // Fireballs
-    ctx.fillStyle = "orange";
-    for (let f of fireballs) {
-        ctx.fillRect(f.x - cameraX, f.y, f.w, f.h);
-    }
-
-    // Mario sprite selection
-    let sprite = imgMarioSmall;
-    if (mario.state === "big") sprite = imgMarioBig;
-    if (mario.state === "fire") sprite = imgMarioFire;
-
-    // Flip Mario if facing left
     ctx.save();
-    if (mario.facing === -1) {
-        ctx.scale(-1, 1);
-        ctx.drawImage(sprite, -(mario.x + mario.w - cameraX), mario.y, mario.w, mario.h);
-    } else {
-        ctx.drawImage(sprite, mario.x - cameraX, mario.y, mario.w, mario.h);
-    }
+    ctx.scale(player.facing, 1);
+    ctx.drawImage(
+        sprite,
+        player.facing === 1 ? player.x : -player.x - player.w,
+        player.y,
+        player.w,
+        player.h
+    );
     ctx.restore();
 
+    // Draw ground + blocks
+    for (let p of platforms) {
+        ctx.drawImage(p.img, p.x, p.y, p.width, p.height);
+    }
+
     // Goal pole
-    ctx.drawImage(goalImg, goalPole.x - cameraX, goalPole.y, goalPole.w, goalPole.h);
+    ctx.drawImage(goalImg, goalPole.x, goalPole.y, goalPole.w, goalPole.h);
 }
 
 
-/***********************
- * GAME LOOP
- ************************/
-function gameLoop() {
-    update();
-    draw();
-    requestAnimationFrame(gameLoop);
-}
+//------------------------------------
+// MOBILE BUTTONS
+//------------------------------------
+document.getElementById("leftBtn").onmousedown = () => player.vx = -4;
+document.getElementById("rightBtn").onmousedown = () => player.vx = 4;
+document.getElementById("leftBtn").onmouseup =
+document.getElementById("rightBtn").onmouseup = () => player.vx = 0;
+
+document.getElementById("jumpBtn").onclick = () => {
+    if (player.onGround) player.vy = -10;
+};
+
+document.getElementById("fireBtn").onclick = () => {
+    if (player.state === "fire") {
+        console.log("FIREBALL!");
+    }
+};
